@@ -44,7 +44,7 @@ export default function LogoSplashScreen1() {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#0F172A" barStyle="light-content" />
+      <StatusBar barStyle="light-content" />
 
       {/* Subtle top corner ambient yellow glow */}
       <View style={styles.ambientGlow} />
@@ -62,7 +62,7 @@ export default function LogoSplashScreen1() {
           <Text style={styles.blinkText}>blink</Text>
           <Text style={styles.itText}>it</Text>
         </View>
-        <Text style={styles.subtitle}>10 MINUTES DELIVERY</Text>
+        <Text style={styles.subtitle}>2-3 DAYS DELIVERY</Text>
       </Animated.View>
 
       <View style={styles.progressBarWrapper}>
@@ -87,7 +87,7 @@ const styles = StyleSheet.create({
     width: 250,
     height: 250,
     borderRadius: 125,
-    backgroundColor: 'rgba(247, 209, 23, 0.08)', // Faint Blinkit yellow glow
+    backgroundColor: 'rgba(247, 209, 23, 0.08)', // Faint yellow glow
   },
   contentContainer: {
     alignItems: 'center',

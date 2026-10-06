@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,50 +8,118 @@ import {
   StatusBar,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector, useDispatch } from 'react-redux';
-import { useRefreshTokenMutation } from '../../redux/apiSlice';
-import { tokenRefreshed } from '../../redux/authSlice';
+import { Icon } from 'react-native-paper';
+import { useGetCustomerMeQuery, useUpdateCustomerProfileMutation, useGetWalletBalanceQuery } from '../../redux/apiSlice';
+import { logoutAction } from '../../redux/authSlice';
 
 const MENU_ITEMS = [
-  { icon: '📦', label: 'My Orders', sub: 'View all past orders' },
-  { icon: '📍', label: 'Manage Addresses', sub: '2 saved addresses' },
-  { icon: '💳', label: 'Payment Methods', sub: 'UPI, Cards, Wallet' },
-  { icon: '🎟️', label: 'Coupons & Offers', sub: '3 coupons available' },
-  { icon: '👥', label: 'Refer & Earn', sub: 'Invite friends, earn ₹100' },
-  { icon: '❓', label: 'Help & Support', sub: 'FAQs and customer care' },
-  { icon: '⚙️', label: 'Settings', sub: 'App preferences' },
+  { icon: 'package-variant-closed', label: 'My Orders', sub: 'View all past orders' },
+  { icon: 'map-marker-outline', label: 'Manage Addresses', sub: '2 saved addresses' },
+  { icon: 'credit-card-outline', label: 'Payment Methods', sub: 'UPI, Cards, Wallet' },
+  { icon: 'ticket-percent-outline', label: 'Coupons & Offers', sub: '3 coupons available' },
+  { icon: 'help-circle-outline', label: 'Help & Support', sub: 'FAQs and customer care' },
+  { icon: 'cog-outline', label: 'Settings', sub: 'App preferences' },
 ];
 
-export default function ProfileScreen() {
+type MenuNavProps = {
+  onWalletPress?: () => void;
+  onMyOrdersPress?: () => void;
+  onManageAddressesPress?: () => void;
+  onPaymentMethodsPress?: () => void;
+  onCouponsPress?: () => void;
+  onReferEarnPress?: () => void;
+  onHelpSupportPress?: () => void;
+  onSettingsPress?: () => void;
+};
+
+interface ProfileScreenProps extends MenuNavProps {
+  onCustomerManagementPress?: () => void;
+}
+
+export default function ProfileScreen({
+  onWalletPress,
+  onCustomerManagementPress,
+  onMyOrdersPress,
+  onManageAddressesPress,
+  onPaymentMethodsPress,
+  onCouponsPress,
+  onReferEarnPress,
+  onHelpSupportPress,
+  onSettingsPress,
+}: ProfileScreenProps) {
   const insets = useSafeAreaInsets();
   const dispatch = useDispatch();
   const auth = useSelector((state: any) => state.auth);
-  const [refreshSessionToken, { isLoading: isRefreshing }] = useRefreshTokenMutation();
+  const { data: customerMeResponse, refetch: refetchCustomerMe } = useGetCustomerMeQuery({});
+  const { data: walletRes } = useGetWalletBalanceQuery({});
+  const [updateProfile, { isLoading: isUpdatingProfile }] = useUpdateCustomerProfileMutation();
 
-  const handleRefreshToken = async () => {
+  const walletBalance =
+    typeof walletRes?.data?.balance === 'number'
+      ? walletRes.data.balance
+      : typeof walletRes?.balance === 'number'
+      ? walletRes.balance
+      : 0;
+  const customerUser = customerMeResponse?.data?.user;
+
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (customerUser) {
+      setEditName(customerUser.name || '');
+      setEditEmail(customerUser.email || '');
+    }
+  }, [customerUser]);
+
+  const handleOpenEditModal = () => {
+    setEditName(customerUser?.name || auth.user?.name || '');
+    setEditEmail(customerUser?.email || auth.user?.email || '');
+    setIsEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!editName.trim()) {
+      Alert.alert('Validation Error', 'Name is required');
+      return;
+    }
     try {
-      const response = await refreshSessionToken().unwrap();
+      const response = await updateProfile({ name: editName, email: editEmail }).unwrap();
       if (response && response.success) {
-        const { accessToken, refreshToken } = response.data;
-        dispatch(tokenRefreshed({ accessToken, refreshToken }));
-        Alert.alert('Session Restored', response.message || 'Token refreshed successfully!');
+        Alert.alert('Success', 'Profile updated successfully!');
+        setIsEditModalVisible(false);
+        refetchCustomerMe();
       } else {
-        Alert.alert('Refresh Failed', response.message || 'Could not refresh session');
+        Alert.alert('Update Failed', response.message || 'Could not update profile');
       }
     } catch (err: any) {
-      const errorMsg = err?.data?.message || err?.message || 'Failed to refresh token';
+      const errorMsg = err?.data?.message || err?.message || 'Failed to update profile';
       Alert.alert('Error', errorMsg);
     }
   };
 
-  const displayName = auth.user?.name || auth.user?.fullName || 'Swati Sharma';
-  const displayPhone = auth.user?.mobile ? `+91 ${auth.user.mobile}` : '+91 98765 43210';
+  const displayName = customerUser?.name || auth.user?.name || auth.user?.fullName || 'Swati Sharma';
+  const displayPhone = customerUser?.mobile || auth.user?.mobile ? `+91 ${customerUser?.mobile || auth.user?.mobile}` : '+91 98765 43210';
+  const isAdmin = auth.user?.role === 'admin';
+
+  const menuItems = [...MENU_ITEMS];
+  if (isAdmin) {
+    menuItems.unshift({ icon: '👥', label: 'Customer Management', sub: 'Manage & suspend customers' });
+  }
+
+  useEffect(() => {
+    StatusBar.setBarStyle('dark-content', true);
+  }, []);
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#F7D117" barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Profile Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -64,7 +132,7 @@ export default function ProfileScreen() {
             <Text style={styles.userPhone}>{displayPhone}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.editBtn}>
+        <TouchableOpacity style={styles.editBtn} onPress={handleOpenEditModal}>
           <Text style={styles.editBtnText}>Edit</Text>
         </TouchableOpacity>
       </View>
@@ -73,25 +141,47 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Blinkit Credits / Wallet Banner */}
-        <View style={styles.walletCard}>
+        {/* App Wallet Banner */}
+        <TouchableOpacity style={styles.walletCard} onPress={onWalletPress} activeOpacity={0.8}>
           <View>
-            <Text style={styles.walletTitle}>Blinkit Wallet</Text>
-            <Text style={styles.walletBalance}>₹ 450.00</Text>
+            <Text style={styles.walletTitle}>App Wallet</Text>
+            <Text style={styles.walletBalance}>₹ {walletBalance.toFixed(2)}</Text>
             <Text style={styles.walletSub}>Available credits</Text>
           </View>
-          <TouchableOpacity style={styles.addMoneyBtn}>
+          <TouchableOpacity style={styles.addMoneyBtn} onPress={onWalletPress} activeOpacity={0.7}>
             <Text style={styles.addMoneyText}>+ Add Money</Text>
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
 
         {/* Menu Items */}
         <View style={styles.menuCard}>
-          {MENU_ITEMS.map((item, index) => (
+          {menuItems.map((item, index) => (
             <React.Fragment key={item.label}>
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (item.label === 'Customer Management' && onCustomerManagementPress) {
+                    onCustomerManagementPress();
+                  } else if (item.label === 'My Orders' && onMyOrdersPress) {
+                    onMyOrdersPress();
+                  } else if (item.label === 'Manage Addresses' && onManageAddressesPress) {
+                    onManageAddressesPress();
+                  } else if (item.label === 'Payment Methods' && onPaymentMethodsPress) {
+                    onPaymentMethodsPress();
+                  } else if (item.label === 'Coupons & Offers' && onCouponsPress) {
+                    onCouponsPress();
+                  } else if (item.label === 'Refer & Earn' && onReferEarnPress) {
+                    onReferEarnPress();
+                  } else if (item.label === 'Help & Support' && onHelpSupportPress) {
+                    onHelpSupportPress();
+                  } else if (item.label === 'Settings' && onSettingsPress) {
+                    onSettingsPress();
+                  }
+                }}
+              >
                 <View style={styles.menuIconBox}>
-                  <Text style={styles.menuIcon}>{item.icon}</Text>
+                  <Icon source={item.icon} size={22} color="#0C831F" />
                 </View>
                 <View style={styles.menuText}>
                   <Text style={styles.menuLabel}>{item.label}</Text>
@@ -99,28 +189,89 @@ export default function ProfileScreen() {
                 </View>
                 <Text style={styles.menuArrow}>›</Text>
               </TouchableOpacity>
-              {index < MENU_ITEMS.length - 1 && <View style={styles.menuDivider} />}
+              {index < menuItems.length - 1 && <View style={styles.menuDivider} />}
             </React.Fragment>
           ))}
         </View>
 
-        {/* Refresh Session Token Button */}
-        {isRefreshing ? (
-          <ActivityIndicator size="small" color="#0C831F" style={{ marginVertical: 12 }} />
-        ) : (
-          <TouchableOpacity style={styles.refreshBtn} onPress={handleRefreshToken} activeOpacity={0.7}>
-            <Text style={styles.refreshText}>🔄 Refresh Session Token</Text>
-          </TouchableOpacity>
-        )}
+
 
         {/* Log Out Button */}
-        <TouchableOpacity style={styles.logoutBtn}>
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() => {
+            Alert.alert('Log Out', 'Are you sure you want to log out?', [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Log Out',
+                style: 'destructive',
+                onPress: () => dispatch(logoutAction()),
+              },
+            ]);
+          }}
+          activeOpacity={0.8}
+        >
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
 
         <Text style={styles.versionText}>Ecommerce App v1.0.0</Text>
         <View style={{ height: 90 }} />
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={isEditModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsEditModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            
+            <Text style={styles.inputLabel}>Full Name</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Enter your name"
+              placeholderTextColor="#94A3B8"
+            />
+
+            <Text style={styles.inputLabel}>Email Address</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              placeholder="Enter your email"
+              placeholderTextColor="#94A3B8"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.cancelBtn]}
+                onPress={() => setIsEditModalVisible(false)}
+                disabled={isUpdatingProfile}
+              >
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.saveBtn]}
+                onPress={handleSaveProfile}
+                disabled={isUpdatingProfile}
+              >
+                {isUpdatingProfile ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -289,17 +440,77 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontWeight: '500',
   },
-  refreshBtn: {
-    backgroundColor: '#F0FDF4',
-    borderRadius: 16,
-    paddingVertical: 14,
+
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-    marginBottom: 16,
+    padding: 20,
   },
-  refreshText: {
-    color: '#0C831F',
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: '100%',
+    padding: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: '#0F172A',
+    marginBottom: 16,
+    backgroundColor: '#F8FAFC',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtn: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cancelBtnText: {
+    color: '#64748B',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  saveBtn: {
+    backgroundColor: '#0C831F',
+  },
+  saveBtnText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
   },

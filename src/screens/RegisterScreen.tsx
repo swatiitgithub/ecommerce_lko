@@ -82,7 +82,7 @@ export default function RegisterScreen({ onRegisterSuccess, onNavigateToLogin }:
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <StatusBar backgroundColor="#F7D117" barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
 
         {/* ─── Top Yellow Banner ─── */}

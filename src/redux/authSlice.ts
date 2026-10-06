@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { saveAuthSession, clearAuthSession } from '../utils/authStorage';
 
 interface UserData {
   id?: string;
@@ -41,6 +42,7 @@ const authSlice = createSlice({
       state.user = action.payload.user;
       state.successMessage = action.payload.message;
       state.error = null;
+      saveAuthSession({ user: action.payload.user });
     },
     loginSuccess: (
       state,
@@ -57,6 +59,11 @@ const authSlice = createSlice({
       state.refreshToken = action.payload.refreshToken;
       state.successMessage = action.payload.message;
       state.error = null;
+      saveAuthSession({
+        user: action.payload.user,
+        accessToken: action.payload.accessToken,
+        refreshToken: action.payload.refreshToken,
+      });
     },
     tokenRefreshed: (
       state,
@@ -69,6 +76,19 @@ const authSlice = createSlice({
       state.refreshToken = action.payload.refreshToken;
       state.successMessage = 'Token refreshed successfully';
       state.error = null;
+      saveAuthSession({
+        accessToken: action.payload.accessToken,
+        refreshToken: action.payload.refreshToken,
+      });
+    },
+    logoutAction: (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.refreshToken = null;
+      state.loading = false;
+      state.error = null;
+      state.successMessage = null;
+      clearAuthSession();
     },
     setError: (state, action: PayloadAction<string>) => {
       state.loading = false;
@@ -88,6 +108,7 @@ export const {
   setSuccess,
   loginSuccess,
   tokenRefreshed,
+  logoutAction,
   setError,
   clearState,
 } = authSlice.actions;

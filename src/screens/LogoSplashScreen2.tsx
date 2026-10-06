@@ -45,7 +45,7 @@ export default function LogoSplashScreen2() {
 
   return (
     <View style={styles.container}>
-      <StatusBar backgroundColor="#080711" barStyle="light-content" />
+      <StatusBar barStyle="light-content" />
 
       {/* Cyberpunk Neon Glow Circles */}
       <View style={styles.neonYellowGlow} />

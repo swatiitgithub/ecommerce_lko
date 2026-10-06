@@ -33,7 +33,7 @@ export default function LogoSplashScreen3() {
   return (
     <View style={styles.container}>
       {/* Light status bar for clean background */}
-      <StatusBar backgroundColor="#F4FBF7" barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Decorative clean light accent grids */}
       <View style={styles.topAccent} />
@@ -61,7 +61,7 @@ export default function LogoSplashScreen3() {
           <Text style={styles.blinkText}>blink</Text>
           <Text style={styles.itText}>it</Text>
         </View>
-        <Text style={styles.brandSubtitle}>Groceries & Essentials in 10 mins</Text>
+        <Text style={styles.brandSubtitle}>Groceries & Essentials in 2 to 3 days</Text>
       </Animated.View>
     </View>
   );
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: 6,
-    backgroundColor: '#0C831F', // Blinkit Green
+    backgroundColor: '#0C831F', // Primary Green
   },
   bottomAccent: {
     position: 'absolute',
@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     right: 0,
     width: '100%',
     height: 6,
-    backgroundColor: '#F7D117', // Blinkit Yellow
+    backgroundColor: '#F7D117', // Primary Yellow
   },
   logoWrapper: {
     justifyContent: 'center',
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   greenBox: {
     width: 80,
     height: 80,
-    backgroundColor: '#0C831F', // Blinkit Green
+    backgroundColor: '#0C831F', // Primary Green
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',

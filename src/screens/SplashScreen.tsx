@@ -72,7 +72,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       {/* Bright Yellow Status Bar matching background */}
-      <StatusBar backgroundColor="#F7D117" barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
 
       {/* Main Branding Section */}
       <View style={styles.brandContainer}>
@@ -92,7 +92,7 @@ export default function SplashScreen() {
           />
         </Animated.View>
 
-        {/* Tagline: [10 MIN] delivery */}
+        {/* Tagline: [2-3 DAYS] delivery */}
         <Animated.View
           style={[
             styles.taglineRow,
@@ -103,7 +103,7 @@ export default function SplashScreen() {
           ]}
         >
           <View style={styles.minutesBadge}>
-            <Text style={styles.badgeText}>10 MIN</Text>
+            <Text style={styles.badgeText}>2-3 DAYS</Text>
           </View>
           <Text style={styles.deliveryText}>delivery</Text>
         </Animated.View>
@@ -134,7 +134,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7D117', // Signature Blinkit Yellow
+    backgroundColor: '#F7D117', // Signature Primary Yellow
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -156,7 +156,7 @@ const styles = StyleSheet.create({
   logoTextIt: {
     fontSize: 56,
     fontWeight: '900',
-    color: '#0C831F', // Signature Blinkit Green
+    color: '#0C831F', // Primary Green
     letterSpacing: -1.5,
   },
   logoImage: {

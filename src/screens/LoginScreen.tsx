@@ -12,12 +12,15 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   TextInput as PaperTextInput,
   Button as PaperButton,
   Surface,
   useTheme,
+  Icon,
 } from 'react-native-paper';
 import { useDispatch } from 'react-redux';
 import { useSendOtpMutation, useVerifyOtpMutation, useLoginMutation } from '../redux/apiSlice';
@@ -26,16 +29,18 @@ import { loginSuccess } from '../redux/authSlice';
 interface LoginScreenProps {
   onLoginSuccess: () => void;
   onNavigateToRegister?: () => void;
+  onClose?: () => void;
 }
 
-export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: LoginScreenProps) {
+export default function LoginScreen({ onLoginSuccess, onNavigateToRegister, onClose }: LoginScreenProps) {
   const theme = useTheme();
   const dispatch = useDispatch();
+  const insets = useSafeAreaInsets();
 
   const [loginMethod, setLoginMethod] = useState<'phone' | 'email'>('phone');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
-  const [otpCodes, setOtpCodes] = useState(['', '', '', '']);
+  const [otpCodes, setOtpCodes] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
   const [isResendActive, setIsResendActive] = useState(false);
 
@@ -93,14 +98,15 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
     try {
       const otpCode = otpCodes.join('');
       const response = await verifyOtp({ mobile: phoneNumber, otp: otpCode }).unwrap();
-      if (response && response.success) {
-        const userData = response.data?.user || { mobile: phoneNumber };
-        const accessToken = response.data?.accessToken || '';
-        const refreshToken = response.data?.refreshToken || '';
+      console.log('[LoginScreen] verifyOtp response:', response);
+      if (response && (response.success || response.data || response.accessToken)) {
+        const userData = response.data?.user || response.user || response.data?.customer || response.customer || { mobile: phoneNumber };
+        const accessToken = response.data?.accessToken || response.accessToken || response.data?.token || response.token || '';
+        const refreshToken = response.data?.refreshToken || response.refreshToken || '';
         dispatch(loginSuccess({ message: response.message || 'Success', user: userData, accessToken, refreshToken }));
         onLoginSuccess();
       } else {
-        Alert.alert('Verification Failed', response.message || 'Invalid OTP');
+        Alert.alert('Verification Failed', response?.message || 'Invalid OTP');
       }
     } catch (err: any) {
       const errorMsg = err?.data?.message || err?.message || 'Verification failed';
@@ -112,18 +118,22 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
     if (!email || !password) return;
     try {
       const response = await login({ email, password }).unwrap();
-      if (response && response.success) {
+      console.log('[LoginScreen] emailLogin response:', response);
+      if (response && (response.success || response.data || response.accessToken)) {
+        const userData = response.data?.user || response.user || response.data?.customer || response.customer || { email };
+        const accessToken = response.data?.accessToken || response.accessToken || response.data?.token || response.token || '';
+        const refreshToken = response.data?.refreshToken || response.refreshToken || '';
         dispatch(loginSuccess({
           message: response.message || 'Login successful',
-          user: response.data.user,
-          accessToken: response.data.accessToken,
-          refreshToken: response.data.refreshToken
+          user: userData,
+          accessToken,
+          refreshToken
         }));
         Alert.alert('Success', response.message || 'Login successful', [
           { text: 'OK', onPress: () => onLoginSuccess() }
         ]);
       } else {
-        Alert.alert('Login Failed', response.message || 'Invalid credentials');
+        Alert.alert('Login Failed', response?.message || 'Invalid credentials');
       }
     } catch (err: any) {
       const errorMsg = err?.data?.message || err?.message || 'Login failed';
@@ -139,10 +149,12 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
   const otpRef1 = useRef<any>(null);
   const otpRef2 = useRef<any>(null);
   const otpRef3 = useRef<any>(null);
-  const otpRefs = [otpRef0, otpRef1, otpRef2, otpRef3];
+  const otpRef4 = useRef<any>(null);
+  const otpRef5 = useRef<any>(null);
+  const otpRefs = [otpRef0, otpRef1, otpRef2, otpRef3, otpRef4, otpRef5];
 
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (step === 'otp' && timer > 0) {
       interval = setInterval(() => setTimer((p) => p - 1), 1000);
     } else if (timer === 0) {
@@ -160,7 +172,7 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
       if (nextStep === 'otp') {
         setTimer(30);
         setIsResendActive(false);
-        setOtpCodes(['', '', '', '']);
+        setOtpCodes(['', '', '', '', '', '']);
         setTimeout(() => otpRefs[0].current?.focus(), 100);
       }
       Animated.parallel([
@@ -175,7 +187,7 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
     const newOtp = [...otpCodes];
     newOtp[index] = val;
     setOtpCodes(newOtp);
-    if (val !== '' && index < 3) otpRefs[index + 1].current?.focus();
+    if (val !== '' && index < 5) otpRefs[index + 1].current?.focus();
   };
 
   const handleOtpKeyPress = (e: any, index: number) => {
@@ -188,15 +200,24 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
   };
 
   const isPhoneValid = phoneNumber.length === 10;
-  const isOtpValid = otpCodes.join('').length === 4;
+  const isOtpValid = otpCodes.join('').length === 6;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <StatusBar backgroundColor="#F7D117" barStyle="dark-content" />
+      <StatusBar barStyle="dark-content" />
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
 
         {/* ─── Top Yellow Banner ─── */}
-        <View style={styles.headerBanner}>
+        <View style={[styles.headerBanner, { paddingTop: Math.max(insets.top + 10, 36) }]}>
+          {onClose && (
+            <TouchableOpacity
+              style={styles.closeLoginModalBtn}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <Icon source="close" size={22} color="#000000" />
+            </TouchableOpacity>
+          )}
           <Image
             source={require('../assest/images/logo.png')}
             style={styles.logoImage}
@@ -207,234 +228,143 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
           <View style={[styles.groceryBubble, styles.bubble2]}><Text style={styles.bubbleEmoji}>🥛</Text></View>
           <View style={[styles.groceryBubble, styles.bubble3]}><Text style={styles.bubbleEmoji}>🍎</Text></View>
           <View style={[styles.groceryBubble, styles.bubble4]}><Text style={styles.bubbleEmoji}>🍞</Text></View>
-          <View style={[styles.groceryBubble, styles.bubble5]}><Text style={styles.bubbleEmoji}>🧀</Text></View>
         </View>
 
         {/* ─── Form Section ─── */}
         <Animated.View style={[styles.formContainer, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
 
-          {step === 'phone' && (
-            <View style={styles.tabRow}>
-              <TouchableOpacity
-                style={[styles.tabButton, loginMethod === 'phone' && styles.activeTabButton]}
-                onPress={() => setLoginMethod('phone')}
-              >
-                <Text style={[styles.tabButtonText, loginMethod === 'phone' && styles.activeTabButtonText]}>Mobile / OTP</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.tabButton, loginMethod === 'email' && styles.activeTabButton]}
-                onPress={() => setLoginMethod('email')}
-              >
-                <Text style={[styles.tabButtonText, loginMethod === 'email' && styles.activeTabButtonText]}>Email & Password</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {loginMethod === 'phone' ? (
-            step === 'phone' ? (
-              <>
-                <Text style={styles.formTitle}>Log in or sign up</Text>
-                <Text style={styles.formSubtitle}>Verify your mobile number to proceed</Text>
-
-                {showNameInput && (
-                  <PaperTextInput
-                    label="Your Name (New User)"
-                    mode="outlined"
-                    value={name}
-                    onChangeText={setName}
-                    style={styles.inputField}
-                    textColor="#0F172A"
-                    theme={{ colors: { primary: '#0C831F' } }}
-                    left={<PaperTextInput.Icon icon="account" />}
-                  />
-                )}
-
-                {/* Paper Surface card for the phone input */}
-                <Surface style={styles.inputSurface} elevation={1}>
-                  <View style={styles.prefixRow}>
-                    <Text style={styles.countryFlag}>🇮🇳</Text>
-                    <Text style={styles.countryCode}>+91</Text>
-                    <View style={styles.inputDivider} />
-                    <PaperTextInput
-                      mode="flat"
-                      placeholder="Enter mobile number"
-                      keyboardType="numeric"
-                      maxLength={10}
-                      value={phoneNumber}
-                      onChangeText={(t) => {
-                        setPhoneNumber(t.replace(/[^0-9]/g, ''));
-                        if (showNameInput) {
-                          setShowNameInput(false);
-                          setName('');
-                        }
-                      }}
-                      autoFocus
-                      style={styles.paperPhoneInput}
-                      underlineColor="transparent"
-                      activeUnderlineColor="transparent"
-                      placeholderTextColor="#94A3B8"
-                      textColor="#0F172A"
-                      contentStyle={styles.paperInputContent}
-                    />
-                  </View>
-                </Surface>
-
-                {isSendingOtp ? (
-                  <ActivityIndicator size="large" color="#0C831F" style={{ marginVertical: 20 }} />
-                ) : (
-                  <PaperButton
-                    mode="contained"
-                    onPress={handleSendOtp}
-                    disabled={!isPhoneValid || (showNameInput && !name.trim())}
-                    style={[styles.actionButton, (!isPhoneValid || (showNameInput && !name.trim())) && styles.buttonDisabled]}
-                    contentStyle={styles.buttonContent}
-                    labelStyle={styles.buttonLabel}
-                    theme={{ colors: { primary: '#0C831F' } }}
-                  >
-                    Continue
-                  </PaperButton>
-                )}
-
-                {onNavigateToRegister && (
-                  <TouchableOpacity onPress={onNavigateToRegister} style={styles.registerLink} activeOpacity={0.7}>
-                    <Text style={styles.registerLinkText}>
-                      Don't have an account? <Text style={styles.registerLinkTextHighlight}>Register here</Text>
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            ) : (
-              <>
-                <View style={styles.otpHeaderRow}>
-                  <TouchableOpacity onPress={() => triggerTransition('phone')} style={styles.backBtn}>
-                    <Text style={styles.backBtnText}>←</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.formTitle}>OTP Verification</Text>
-                </View>
-                <Text style={styles.formSubtitle}>
-                  Code sent to +91 {phoneNumber.slice(0, 3)}***{phoneNumber.slice(7)}
-                </Text>
-
-                {/* 4 OTP boxes */}
-                <View style={styles.otpRow}>
-                  {otpCodes.map((code, index) => (
-                    <PaperTextInput
-                      key={index}
-                      ref={otpRefs[index]}
-                      mode="outlined"
-                      keyboardType="numeric"
-                      maxLength={1}
-                      value={code}
-                      onChangeText={(t) => handleOtpChange(t, index)}
-                      onKeyPress={(e) => handleOtpKeyPress(e, index)}
-                      style={styles.otpBox}
-                      outlineStyle={[styles.otpOutline, code !== '' && styles.otpOutlineFilled]}
-                      textColor="#0F172A"
-                      contentStyle={styles.otpContent}
-                      theme={{
-                        colors: {
-                          primary: '#0C831F',
-                          outline: code !== '' ? '#0C831F' : '#CBD5E1',
-                          background: code !== '' ? '#F0FDF4' : '#F8FAFC',
-                        },
-                      }}
-                    />
-                  ))}
-                </View>
-
-                <View style={styles.timerRow}>
-                  {isResendActive ? (
-                    <PaperButton
-                      mode="text"
-                      onPress={handleSendOtp}
-                      labelStyle={styles.resendLabel}
-                      theme={{ colors: { primary: '#0C831F' } }}
-                    >
-                      Resend OTP
-                    </PaperButton>
-                  ) : (
-                    <Text style={styles.timerText}>Resend OTP in {timer}s</Text>
-                  )}
-                </View>
-
-                {isVerifyingOtp ? (
-                  <ActivityIndicator size="large" color="#0C831F" style={{ marginVertical: 20 }} />
-                ) : (
-                  <PaperButton
-                    mode="contained"
-                    onPress={handleVerifyOtp}
-                    disabled={!isOtpValid}
-                    style={[styles.actionButton, !isOtpValid && styles.buttonDisabled]}
-                    contentStyle={styles.buttonContent}
-                    labelStyle={styles.buttonLabel}
-                    theme={{ colors: { primary: '#0C831F' } }}
-                  >
-                    Verify & Proceed
-                  </PaperButton>
-                )}
-              </>
-            )
-          ) : (
-            // Email & Password Login Form
+          {step === 'phone' ? (
             <>
-              <Text style={styles.formTitle}>Log in with Email</Text>
-              <Text style={styles.formSubtitle}>Enter your credentials to access your account</Text>
+              <Text style={styles.formTitle}>Log in or sign up</Text>
+              <Text style={styles.formSubtitle}>Verify your mobile number to proceed</Text>
 
-              {/* Email Address Input */}
-              <PaperTextInput
-                label="Email Address"
-                mode="outlined"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.inputField}
-                textColor="#0F172A"
-                theme={{ colors: { primary: '#0C831F' } }}
-                left={<PaperTextInput.Icon icon="email" />}
-              />
+              {showNameInput && (
+                <PaperTextInput
+                  label="Your Name (New User)"
+                  mode="outlined"
+                  value={name}
+                  onChangeText={setName}
+                  style={styles.inputField}
+                  textColor="#0F172A"
+                  theme={{ colors: { primary: '#0C831F' } }}
+                  left={<PaperTextInput.Icon icon="account" />}
+                />
+              )}
 
-              {/* Password Input */}
-              <PaperTextInput
-                label="Password"
-                mode="outlined"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                style={styles.inputField}
-                textColor="#0F172A"
-                theme={{ colors: { primary: '#0C831F' } }}
-                left={<PaperTextInput.Icon icon="lock" />}
-                right={
-                  <PaperTextInput.Icon
-                    icon={showPassword ? "eye-off" : "eye"}
-                    onPress={() => setShowPassword(!showPassword)}
+              {/* Paper Surface card for the phone input */}
+              <Surface style={styles.inputSurface} elevation={1}>
+                <View style={styles.prefixRow}>
+                  <Text style={styles.countryFlag}>🇮🇳</Text>
+                  <Text style={styles.countryCode}>+91</Text>
+                  <View style={styles.inputDivider} />
+                  <PaperTextInput
+                    mode="flat"
+                    placeholder="Enter mobile number"
+                    keyboardType="numeric"
+                    maxLength={10}
+                    value={phoneNumber}
+                    onChangeText={(t) => {
+                      setPhoneNumber(t.replace(/[^0-9]/g, ''));
+                      if (showNameInput) {
+                        setShowNameInput(false);
+                        setName('');
+                      }
+                    }}
+                    autoFocus
+                    style={styles.paperPhoneInput}
+                    underlineColor="transparent"
+                    activeUnderlineColor="transparent"
+                    placeholderTextColor="#94A3B8"
+                    textColor="#0F172A"
+                    contentStyle={styles.paperInputContent}
                   />
-                }
-              />
+                </View>
+              </Surface>
 
-              {isLoggingIn ? (
+              {isSendingOtp ? (
                 <ActivityIndicator size="large" color="#0C831F" style={{ marginVertical: 20 }} />
               ) : (
                 <PaperButton
                   mode="contained"
-                  onPress={handleEmailLogin}
-                  disabled={!email || !password}
-                  style={[styles.actionButton, (!email || !password) && styles.buttonDisabled]}
+                  onPress={handleSendOtp}
+                  disabled={!isPhoneValid || (showNameInput && !name.trim())}
+                  style={[styles.actionButton, (!isPhoneValid || (showNameInput && !name.trim())) && styles.buttonDisabled]}
                   contentStyle={styles.buttonContent}
                   labelStyle={styles.buttonLabel}
                   theme={{ colors: { primary: '#0C831F' } }}
                 >
-                  Log In
+                  Continue
                 </PaperButton>
               )}
-
-              {onNavigateToRegister && (
-                <TouchableOpacity onPress={onNavigateToRegister} style={styles.registerLink} activeOpacity={0.7}>
-                  <Text style={styles.registerLinkText}>
-                    Don't have an account? <Text style={styles.registerLinkTextHighlight}>Register here</Text>
-                  </Text>
+            </>
+          ) : (
+            <>
+              <View style={styles.otpHeaderRow}>
+                <TouchableOpacity onPress={() => triggerTransition('phone')} style={styles.backBtn}>
+                  <Text style={styles.backBtnText}>←</Text>
                 </TouchableOpacity>
+                <Text style={styles.formTitle}>OTP Verification</Text>
+              </View>
+              <Text style={styles.formSubtitle}>
+                Code sent to +91 {phoneNumber.slice(0, 3)}***{phoneNumber.slice(7)}
+              </Text>
+
+              {/* 6 OTP boxes */}
+              <View style={styles.otpRow}>
+                {otpCodes.map((code, index) => (
+                  <PaperTextInput
+                    key={index}
+                    ref={otpRefs[index]}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    maxLength={1}
+                    value={code}
+                    onChangeText={(t) => handleOtpChange(t, index)}
+                    onKeyPress={(e) => handleOtpKeyPress(e, index)}
+                    style={styles.otpBox}
+                    outlineStyle={[styles.otpOutline, code !== '' && styles.otpOutlineFilled]}
+                    textColor="#0F172A"
+                    contentStyle={styles.otpContent}
+                    theme={{
+                      colors: {
+                        primary: '#0C831F',
+                        outline: code !== '' ? '#0C831F' : '#CBD5E1',
+                        background: code !== '' ? '#F0FDF4' : '#F8FAFC',
+                      },
+                    }}
+                  />
+                ))}
+              </View>
+
+              <View style={styles.timerRow}>
+                {isResendActive ? (
+                  <PaperButton
+                    mode="text"
+                    onPress={handleSendOtp}
+                    labelStyle={styles.resendLabel}
+                    theme={{ colors: { primary: '#0C831F' } }}
+                  >
+                    Resend OTP
+                  </PaperButton>
+                ) : (
+                  <Text style={styles.timerText}>Resend OTP in {timer}s</Text>
+                )}
+              </View>
+
+              {isVerifyingOtp ? (
+                <ActivityIndicator size="large" color="#0C831F" style={{ marginVertical: 20 }} />
+              ) : (
+                <PaperButton
+                  mode="contained"
+                  onPress={handleVerifyOtp}
+                  disabled={!isOtpValid}
+                  style={[styles.actionButton, !isOtpValid && styles.buttonDisabled]}
+                  contentStyle={styles.buttonContent}
+                  labelStyle={styles.buttonLabel}
+                  theme={{ colors: { primary: '#0C831F' } }}
+                >
+                  Verify & Proceed
+                </PaperButton>
               )}
             </>
           )}
@@ -448,18 +378,18 @@ export default function LoginScreen({ onLoginSuccess, onNavigateToRegister }: Lo
   );
 }
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  scrollContainer: { flexGrow: 1, backgroundColor: '#FFFFFF' },
+  container: { flex: 1, backgroundColor: '#F7D117' },
+  scrollContainer: { flexGrow: 1, backgroundColor: '#F7D117' },
   headerBanner: {
-    height: 250,
+    height: SCREEN_HEIGHT * 0.38,
     backgroundColor: '#F7D117',
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
     position: 'relative',
+    paddingBottom: 20,
   },
   bannerLogoText: {
     fontSize: 48,
@@ -468,8 +398,8 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
   logoImage: {
-    width: 200,
-    height: 90,
+    width: 220,
+    height: 95,
   },
   bannerTagline: {
     fontSize: 14,
@@ -487,18 +417,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
   },
-  bubbleEmoji: { fontSize: 22 },
-  bubble1: { top: 30, left: 30 },
-  bubble2: { top: 50, right: 40 },
-  bubble3: { bottom: 40, left: 40 },
-  bubble4: { bottom: 60, right: 30 },
-  bubble5: { top: 130, left: '46%' },
+  bubbleEmoji: { fontSize: 20 },
+  bubble1: { top: 20, left: 20 },
+  bubble2: { top: 20, right: 20 },
+  bubble3: { bottom: 35, left: 24 },
+  bubble4: { bottom: 35, right: 24 },
   formContainer: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 24,
-    paddingTop: 36,
-    paddingBottom: 24,
+    paddingTop: 32,
+    paddingBottom: 28,
+    minHeight: SCREEN_HEIGHT * 0.62,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 8,
   },
   formTitle: {
     fontSize: 22,
@@ -559,19 +501,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   otpBox: {
-    width: 60,
-    height: 60,
-    fontSize: 20,
+    width: 46,
+    height: 52,
   },
   otpOutline: {
-    borderRadius: 14,
+    borderRadius: 10,
   },
   otpOutlineFilled: {
     borderWidth: 2,
   },
   otpContent: {
     textAlign: 'center',
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
   },
   timerRow: {
@@ -663,5 +604,17 @@ const styles = StyleSheet.create({
   inputField: {
     marginBottom: 16,
     backgroundColor: '#FFFFFF',
+  },
+  closeLoginModalBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 });
